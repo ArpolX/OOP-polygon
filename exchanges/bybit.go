@@ -22,7 +22,6 @@ type BybitPrice struct {
 
 func (c *Client) TradesBybit(symbol string, limit int) (Bybit, error) {
 	UrlRes := fmt.Sprintf("%ssymbol=%s&limit=%d", bybit, symbol, limit)
-	fmt.Println(UrlRes)
 
 	req, err := c.Client.Get(UrlRes)
 	if err != nil {

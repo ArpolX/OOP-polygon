@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"reflect"
 	"strconv"
 )
 
 type PriceAggregator interface {
-	CreaterDeviationMap() DeviationMap
-	GetPrices(DeviationMap) error
-	GetAverage(DeviationMap) error
+	CreaterDeviationMap() (float64, DeviationMap)
+	GetPrices(avp float64, DeviationMap DeviationMap, ab_deviation float64) error
+	GetAverage(avp float64, DeviationMap DeviationMap, ab_deviation float64) error
 }
 
 type DeviationMap = map[string]float64
@@ -22,59 +23,87 @@ type TradePrice struct {
 	Mexc_Price    string
 }
 
+func NewTradePrice(opt ...func(t *TradePrice)) *TradePrice {
+	tradePrice := &TradePrice{}
+
+	for _, op := range opt {
+		op(tradePrice)
+	}
+
+	return tradePrice
+}
+
+func WithBybit(bybit exchanges.Bybit) func(t *TradePrice) {
+	return func(t *TradePrice) {
+		t.Bybit_Price = bybit.Result.Bybit_Price[0].Price
+	}
+}
+
+func WithBinance(binance exchanges.Binance) func(t *TradePrice) {
+	return func(t *TradePrice) {
+		t.Binance_Price = binance.Binance_Price[0].Price
+	}
+}
+
+func WithMexc(mexc exchanges.Mexc) func(t *TradePrice) {
+	return func(t *TradePrice) {
+		t.Mexc_Price = mexc.Mexc_Price[0].Price
+	}
+}
+
 func main() {
 	client := exchanges.NewClient(exchanges.WithClient())
-	err := ProcessData(client)
+	PriceAggregator, err := ProcessData(client)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	avp, DeviationMap := PriceAggregator.CreaterDeviationMap()
+
+	err = PriceAggregator.GetPrices(avp, DeviationMap, 0.5)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = PriceAggregator.GetAverage(avp, DeviationMap, 0.5)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 }
 
-func ProcessData(e exchanges.Exchanger) error {
-	var tradePrice TradePrice
+func ProcessData(e exchanges.Exchanger) (PriceAggregator, error) {
 	bybit, err := e.TradesBybit("ETHUSDT", 10)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	tradePrice.Bybit_Price = bybit.Result.Bybit_Price[0].Price
-	fmt.Println(bybit.Result.Bybit_Price)
 
 	binance, err := e.TradesBinance("ETHUSDT", 10)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	tradePrice.Binance_Price = binance.Binance_Price[0].Price
-	fmt.Println(binance.Binance_Price)
 
 	mexc, err := e.TradesMexc("ETHUSDT", 10)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	tradePrice.Mexc_Price = mexc.Mexc_Price[0].Price
-	fmt.Println(mexc)
-
-	avp, DeviationMap := tradePrice.CreaterDeviationMap()
-
-	err = tradePrice.GetPrices(avp, DeviationMap, 0.5)
-	if err != nil {
-		return err
+	if reflect.DeepEqual(bybit, exchanges.Bybit{}) || reflect.DeepEqual(binance, exchanges.Binance{}) || reflect.DeepEqual(mexc, exchanges.Mexc{}) {
+		return nil, fmt.Errorf("ошибка парсинга")
 	}
 
-	err = tradePrice.GetAverage(avp, DeviationMap, 0.5)
-	if err != nil {
-		return err
-	}
+	tradePrice := NewTradePrice(WithBybit(bybit), WithBinance(binance), WithMexc(mexc))
 
-	return nil
+	return tradePrice, nil
 }
 
 func (t TradePrice) CreaterDeviationMap() (float64, DeviationMap) {
 	DeviationMap := make(map[string]float64)
 	DeviationMap["Bybit"], _ = strconv.ParseFloat(t.Bybit_Price, 64)
 	DeviationMap["Binance"], _ = strconv.ParseFloat(t.Binance_Price, 64)
-	DeviationMap["Maxc"], _ = strconv.ParseFloat(t.Mexc_Price, 64)
-	avp := (DeviationMap["Bybit"] + DeviationMap["Binance"] + DeviationMap["Maxc"]) / 3
+	DeviationMap["Mexc"], _ = strconv.ParseFloat(t.Mexc_Price, 64)
+	avp := (DeviationMap["Bybit"] + DeviationMap["Binance"] + DeviationMap["Mexc"]) / 3
 
 	return avp, DeviationMap
 }

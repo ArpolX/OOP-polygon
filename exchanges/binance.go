@@ -21,7 +21,6 @@ type BinancePrice struct {
 
 func (c *Client) TradesBinance(symbol string, limit int) (Binance, error) {
 	UrlRes := fmt.Sprintf("%ssymbol=%s&limit=%d", binance, symbol, limit)
-	fmt.Println(UrlRes)
 
 	req, err := c.Client.Get(UrlRes)
 	if err != nil {

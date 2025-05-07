@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-//go:generate mockgen -source=client.go -destination=OOP-polygon/mocks/Exchanger.go -package=mocks
+//go:generate mockgen -destination=../mocks/Exchanger.go -package=mocks OOP-polygon/exchanges Exchanger
+
 type Exchanger interface {
 	TradesBybit(symbol string, limit int) (Bybit, error)
 	TradesBinance(symbol string, limit int) (Binance, error)

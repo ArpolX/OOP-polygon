@@ -21,7 +21,6 @@ type MexcPrice struct {
 
 func (c *Client) TradesMexc(symbol string, limit int) (Mexc, error) {
 	UrlRes := fmt.Sprintf("%ssymbol=%s&limit=%d", mexc, symbol, limit)
-	fmt.Println(UrlRes)
 
 	req, err := c.Client.Get(UrlRes)
 	if err != nil {
